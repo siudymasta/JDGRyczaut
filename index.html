@@ -1,0 +1,591 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mój Podatek Ryczałtowy JDG</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 15px;
+            color: #333;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+        .row .form-group {
+            flex: 1;
+        }
+        .input-with-btn {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        /* Pole wpisywania kwoty zajmuje większość miejsca */
+        .input-with-btn input {
+            flex: 3;
+        }
+        /* Przycisk jest węższy, dopasowany do tekstu */
+        .btn-copy {
+            flex: 1;
+            background-color: #16a085;
+            color: white;
+            border: none;
+            padding: 10px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+            font-weight: bold;
+            height: 42px;
+        }
+        .btn-copy:hover {
+            background-color: #138d75;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            height: 42px;
+        }
+        input:read-only {
+            background-color: #eaf2f8;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        button {
+            width: 100%;
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .btn-secondary {
+            background-color: #7f8c8d;
+            margin-top: 8px;
+        }
+        .btn-secondary:hover {
+            background-color: #626567;
+        }
+        .btn-stats {
+            background-color: #9b59b6;
+            margin-bottom: 15px;
+        }
+        .btn-stats:hover {
+            background-color: #8e44ad;
+        }
+        .stats-card {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .stats-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #f1c40f;
+            text-align: center;
+        }
+        .month-card {
+            background: #f8f9fa;
+            border-left: 5px solid #27ae60;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .month-card h3 {
+            margin: 0 0 8px 0;
+            color: #2c3e50;
+        }
+        .actions-btns {
+            float: right;
+        }
+        .action-btn {
+            border: none;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: white;
+            margin-left: 4px;
+        }
+        .edit-btn { background-color: #f39c12; }
+        .edit-btn:hover { background-color: #d68910; }
+        .delete-btn { background-color: #e74c3c; }
+        .delete-btn:hover { background-color: #c0392b; }
+       
+        .tax-info {
+            background: #eaf2f8;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .backup-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+       
+        .view-section {
+            display: none;
+        }
+        .view-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- ================= STRONA 1: FORMULARZ I HISTORIA ================= -->
+    <div id="mainView" class="view-section active">
+        <h2>Ryczałt JDG - Rozliczenia</h2>
+       
+        <button class="btn-stats" onclick="switchView('statsView')">📊 Zobacz Podsumowanie Roczne</button>
+
+        <input type="hidden" id="editingId" value="">
+
+        <div class="row">
+            <div class="form-group">
+                <label for="monthSelect">Miesiąc:</label>
+                <select id="monthSelect">
+                    <option value="Styczeń">Styczeń</option>
+                    <option value="Luty">Luty</option>
+                    <option value="Marzec">Marzec</option>
+                    <option value="Kwiecień">Kwiecień</option>
+                    <option value="Maj">Maj</option>
+                    <option value="Czerwiec">Czerwiec</option>
+                    <option value="Lipiec">Lipiec</option>
+                    <option value="Sierpień">Sierpień</option>
+                    <option value="Wrzesień">Wrzesień</option>
+                    <option value="Październik">Październik</option>
+                    <option value="Listopad">Listopad</option>
+                    <option value="Grudzień">Grudzień</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="yearInput">Rok:</label>
+                <input type="number" id="yearInput" value="2026" placeholder="2026" oninput="loadEntries()">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="revenue">Przychód (zł):</label>
+            <input type="number" id="revenue" step="0.01" placeholder="0.00" oninput="calculateAll()">
+        </div>
+
+        <div class="form-group">
+            <label for="socialZus">Składki społeczne itp. (zł):</label>
+            <div class="input-with-btn">
+                <input type="number" id="socialZus" step="0.01" placeholder="0.00" oninput="calculateAll()">
+                <button type="button" class="btn-copy" onclick="copyFromPrevious('socialZus')">Skopiuj</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="healthZus">Składka zdrowotna (zł):</label>
+            <div class="input-with-btn">
+                <input type="number" id="healthZus" step="0.01" placeholder="0.00" oninput="calculateAll()">
+                <button type="button" class="btn-copy" onclick="copyFromPrevious('healthZus')">Skopiuj</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="totalZusInput">Suma składek ZUS (zł):</label>
+            <input type="number" id="totalZusInput" step="0.01" placeholder="0.00" readonly>
+        </div>
+
+        <div class="form-group">
+            <label for="taxRate">Stawka ryczałtu:</label>
+            <select id="taxRate" onchange="calculateAll()">
+                <option value="17">17% (np. wolne zawody)</option>
+                <option value="15">15% (np. usługi niematerialne, reklama)</option>
+                <option value="14">14% (np. usługi w zakresie opieki medycznej)</option>
+                <option value="12" selected>12% (np. usługi IT, programowanie)</option>
+                <option value="10">10% (np. kupno/sprzedaż towarów)</option>
+                <option value="8.5">8.5% (np. usługi usługowe, wynajem)</option>
+                <option value="5.5">5.5% (np. działalność wytwórcza, roboty budowlane)</option>
+                <option value="3">3% (np. gastronomia, handel)</option>
+                <option value="2">2% (np. sprzedaż przetworzonych produktów roślinnych/zwierzęcych)</option>
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label for="calculatedTaxInput">Wyliczony podatek (zł):</label>
+                <input type="number" id="calculatedTaxInput" step="0.01" placeholder="0.00" readonly>
+            </div>
+            <div class="form-group">
+                <label for="netTaxInput">Po odliczeniu (zł):</label>
+                <input type="number" id="netTaxInput" step="0.01" placeholder="0.00" readonly>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="paidTax">Ręcznie wpłacony podatek (zł):</label>
+            <input type="number" id="paidTax" step="0.01" placeholder="0.00">
+        </div>
+
+        <button id="saveBtn" onclick="saveEntry()">Zapisz miesiąc</button>
+        <button id="cancelEditBtn" class="btn-secondary" style="display: none;" onclick="cancelEdit()">Anuluj edycję</button>
+
+        <h3>Historia wpisów</h3>
+        <div id="entriesList"></div>
+
+        <div class="backup-row">
+            <button class="btn-secondary" onclick="exportData()">Eksportuj</button>
+            <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Importuj</button>
+            <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importData(event)">
+        </div>
+    </div>
+
+
+    <!-- ================= STRONA 2: PODSUMOWANIE ROCZNE ================= -->
+    <div id="statsView" class="view-section">
+        <h2>Podsumowanie Roczne</h2>
+       
+        <button class="btn-secondary" style="margin-bottom: 15px;" onclick="switchView('mainView')">← Powrót do formularza</button>
+
+        <div class="stats-card">
+            <h3 id="statsTitle">Rok 2026</h3>
+            <p>Łączny przychód: <b id="statRevenue">0.00 zł</b></p>
+            <p>Suma składek ZUS: <b id="statZus">0.00 zł</b></p>
+            <p>Należny podatek (suma): <b id="statCalcTax">0.00 zł</b></p>
+            <p>Po odliczeniu (suma): <b id="statNetTax">0.00 zł</b></p>
+            <p>Wpłacony podatek (suma): <b id="statPaidTax" style="color: #2ecc71;">0.00 zł</b></p>
+        </div>
+
+        <h3>Rozbicie na miesiące</h3>
+        <div id="statsMonthsList"></div>
+    </div>
+
+</div>
+
+<script>
+    const monthsOrder = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById('yearInput').value = new Date().getFullYear();
+        loadEntries();
+    });
+
+    function switchView(viewId) {
+        document.querySelectorAll('.view-section').forEach(section => {
+            section.classList.remove('active');
+        });
+        document.getElementById(viewId).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+       
+        if (viewId === 'statsView') {
+            loadEntries();
+        }
+    }
+
+    function copyFromPrevious(fieldType) {
+        const currentMonth = document.getElementById('monthSelect').value;
+        const currentYear = document.getElementById('yearInput').value;
+       
+        const currentIndex = monthsOrder.indexOf(currentMonth);
+        if (currentIndex <= 0) {
+            alert("To jest Styczeń – brak poprzedniego miesiąca w tym roku!");
+            return;
+        }
+
+        const previousMonthName = monthsOrder[currentIndex - 1];
+        let entries = JSON.parse(localStorage.getItem('jdg_ryczalt_entries')) || [];
+
+        const prevEntry = entries.find(e => {
+            const mMatch = e.monthNameOnly ? e.monthNameOnly === previousMonthName : e.month.includes(previousMonthName);
+            const yMatch = e.yearOnly ? e.yearOnly == currentYear : e.month.includes(currentYear);
+            return mMatch && yMatch;
+        });
+
+        if (!prevEntry) {
+            alert(`Brak zapisanego wpisu dla poprzedniego miesiąca (${previousMonthName} ${currentYear}), z którego można skopiować dane.`);
+            return;
+        }
+
+        if (fieldType === 'socialZus') {
+            document.getElementById('socialZus').value = prevEntry.socialZus;
+        } else if (fieldType === 'healthZus') {
+            document.getElementById('healthZus').value = prevEntry.healthZus;
+        }
+
+        calculateAll();
+    }
+
+    function calculateAll() {
+        const revenue = parseFloat(document.getElementById('revenue').value) || 0;
+        const socialZus = parseFloat(document.getElementById('socialZus').value) || 0;
+        const healthZus = parseFloat(document.getElementById('healthZus').value) || 0;
+        const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+
+        const totalZus = socialZus + healthZus;
+        document.getElementById('totalZusInput').value = totalZus.toFixed(2);
+
+        const calculatedTax = (revenue * (taxRate / 100)).toFixed(2);
+        document.getElementById('calculatedTaxInput').value = calculatedTax;
+
+        let baseForTax = revenue - (healthZus * 0.5);
+        if (baseForTax < 0) baseForTax = 0;
+       
+        const netTax = (baseForTax * (taxRate / 100)).toFixed(2);
+        document.getElementById('netTaxInput').value = netTax;
+    }
+
+    function saveEntry() {
+        const month = document.getElementById('monthSelect').value;
+        const year = document.getElementById('yearInput').value;
+        const fullMonthName = `${month} ${year}`;
+       
+        const revenue = parseFloat(document.getElementById('revenue').value) || 0;
+        const socialZus = parseFloat(document.getElementById('socialZus').value) || 0;
+        const healthZus = parseFloat(document.getElementById('healthZus').value) || 0;
+        const totalZus = parseFloat(document.getElementById('totalZusInput').value) || 0;
+        const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+        const calculatedTax = document.getElementById('calculatedTaxInput').value || "0.00";
+        const netTax = document.getElementById('netTaxInput').value || "0.00";
+        const paidTax = parseFloat(document.getElementById('paidTax').value) || 0;
+
+        if (!year) {
+            alert("Proszę wpisać rok!");
+            return;
+        }
+
+        let entries = JSON.parse(localStorage.getItem('jdg_ryczalt_entries')) || [];
+        const editingId = document.getElementById('editingId').value;
+
+        if (editingId) {
+            entries = entries.map(entry => {
+                if (entry.id == editingId) {
+                    return {
+                        id: Number(editingId),
+                        month: fullMonthName,
+                        monthNameOnly: month,
+                        yearOnly: year,
+                        revenue, socialZus, healthZus, totalZus, taxRate, calculatedTax, netTax, paidTax
+                    };
+                }
+                return entry;
+            });
+        } else {
+            const entry = {
+                id: Date.now(),
+                month: fullMonthName,
+                monthNameOnly: month,
+                yearOnly: year,
+                revenue, socialZus, healthZus, totalZus, taxRate, calculatedTax, netTax, paidTax
+            };
+            entries.push(entry);
+        }
+
+        localStorage.setItem('jdg_ryczalt_entries', JSON.stringify(entries));
+        cancelEdit();
+        loadEntries();
+    }
+
+    function loadEntries() {
+        const listContainer = document.getElementById('entriesList');
+        const statsMonthsList = document.getElementById('statsMonthsList');
+        let entries = JSON.parse(localStorage.getItem('jdg_ryczalt_entries')) || [];
+        const currentYearFilter = document.getElementById('yearInput').value;
+       
+        listContainer.innerHTML = '';
+        statsMonthsList.innerHTML = '';
+
+        const filteredEntries = entries.filter(entry => {
+            if (entry.yearOnly) {
+                return entry.yearOnly == currentYearFilter;
+            } else {
+                return entry.month.includes(currentYearFilter);
+            }
+        });
+
+        filteredEntries.sort((a, b) => {
+            return monthsOrder.indexOf(a.monthNameOnly) - monthsOrder.indexOf(b.monthNameOnly);
+        });
+
+        let totalRev = 0;
+        let totalZusSum = 0;
+        let totalCalcTaxSum = 0;
+        let totalNetTaxSum = 0;
+        let totalPaidTaxSum = 0;
+
+        filteredEntries.forEach(entry => {
+            totalRev += entry.revenue;
+            totalZusSum += Number(entry.totalZus);
+            totalCalcTaxSum += Number(entry.calculatedTax);
+            totalNetTaxSum += Number(entry.netTax);
+            totalPaidTaxSum += entry.paidTax;
+        });
+
+        document.getElementById('statsTitle').innerText = `Rok ${currentYearFilter}`;
+        document.getElementById('statRevenue').innerText = totalRev.toFixed(2) + ' zł';
+        document.getElementById('statZus').innerText = totalZusSum.toFixed(2) + ' zł';
+        document.getElementById('statCalcTax').innerText = totalCalcTaxSum.toFixed(2) + ' zł';
+        document.getElementById('statNetTax').innerText = totalNetTaxSum.toFixed(2) + ' zł';
+        document.getElementById('statPaidTax').innerText = totalPaidTaxSum.toFixed(2) + ' zł';
+
+        if (filteredEntries.length === 0) {
+            listContainer.innerHTML = `<p style="color: #777; text-align: center;">Brak zapisanych miesięcy w roku ${currentYearFilter}.</p>`;
+            statsMonthsList.innerHTML = `<p style="color: #777; text-align: center;">Brak danych do rozbicia.</p>`;
+            return;
+        }
+
+        filteredEntries.forEach((entry) => {
+            const card = document.createElement('div');
+            card.className = 'month-card';
+            card.innerHTML = `
+                <div class="actions-btns">
+                    <button class="action-btn edit-btn" onclick="editEntry(${entry.id})">Edytuj</button>
+                    <button class="action-btn delete-btn" onclick="deleteEntry(${entry.id})">Usuń</button>
+                </div>
+                <h3>${entry.month}</h3>
+                <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b></p>
+                <p>Społeczne: ${entry.socialZus.toFixed(2)} zł | Zdrowotna: ${entry.healthZus.toFixed(2)} zł</p>
+                <p>Suma ZUS: <b>${Number(entry.totalZus).toFixed(2)} zł</b></p>
+                <div class="tax-info">
+                    <p style="margin: 0 0 4px 0;">Stawka ryczałtu: <b>${entry.taxRate}%</b></p>
+                    <p style="margin: 0 0 4px 0;">Wyliczony podatek: <b>${entry.calculatedTax} zł</b></p>
+                    <p style="margin: 0 0 4px 0;">Po odliczeniu: <b>${entry.netTax} zł</b></p>
+                    <p style="margin: 0;">Wpłacony podatek: <b style="color: #27ae60;">${entry.paidTax.toFixed(2)} zł</b></p>
+                </div>
+            `;
+            listContainer.appendChild(card);
+
+            const statCard = document.createElement('div');
+            statCard.className = 'month-card';
+            statCard.innerHTML = `
+                <h3>${entry.month}</h3>
+                <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b> (Stawka: ${entry.taxRate}%)</p>
+                <div class="tax-info">
+                    <p style="margin: 0 0 4px 0;">Należny podatek: <b>${entry.calculatedTax} zł</b></p>
+                    <p style="margin: 0 0 4px 0;">Po odliczeniu: <b>${entry.netTax} zł</b></p>
+                    <p style="margin: 0;">Kwota wpłacona: <b style="color: #27ae60;">${entry.paidTax.toFixed(2)} zł</b></p>
+                </div>
+            `;
+            statsMonthsList.appendChild(statCard);
+        });
+    }
+
+    function editEntry(id) {
+        let entries = JSON.parse(localStorage.getItem('jdg_ryczalt_entries')) || [];
+        const entry = entries.find(e => e.id == id);
+        if (!entry) return;
+
+        if (entry.monthNameOnly) document.getElementById('monthSelect').value = entry.monthNameOnly;
+        if (entry.yearOnly) document.getElementById('yearInput').value = entry.yearOnly;
+        document.getElementById('revenue').value = entry.revenue;
+        document.getElementById('socialZus').value = entry.socialZus;
+        document.getElementById('healthZus').value = entry.healthZus;
+        document.getElementById('taxRate').value = entry.taxRate;
+        document.getElementById('paidTax').value = entry.paidTax;
+       
+        calculateAll();
+
+        document.getElementById('editingId').value = entry.id;
+        document.getElementById('saveBtn').innerText = "Zaktualizuj miesiąc";
+        document.getElementById('cancelEditBtn').style.display = "block";
+       
+        switchView('mainView');
+    }
+
+    function cancelEdit() {
+        document.getElementById('editingId').value = '';
+        document.getElementById('saveBtn').innerText = "Zapisz miesiąc";
+        document.getElementById('cancelEditBtn').style.display = "none";
+        clearForm();
+    }
+
+    function clearForm() {
+        document.getElementById('revenue').value = '';
+        document.getElementById('socialZus').value = '';
+        document.getElementById('healthZus').value = '';
+        document.getElementById('totalZusInput').value = '';
+        document.getElementById('calculatedTaxInput').value = '';
+        document.getElementById('netTaxInput').value = '';
+        document.getElementById('paidTax').value = '';
+    }
+
+    function deleteEntry(id) {
+        if (!confirm("Czy na pewno chcesz usunąć ten wpis?")) return;
+        let entries = JSON.parse(localStorage.getItem('jdg_ryczalt_entries')) || [];
+        entries = entries.filter(entry => entry.id !== id);
+        localStorage.setItem('jdg_ryczalt_entries', JSON.stringify(entries));
+        loadEntries();
+    }
+
+    function exportData() {
+        let entries = localStorage.getItem('jdg_ryczalt_entries') || '[]';
+        let blob = new Blob([entries], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = "kopia_zapasowa_jdg.json";
+        a.click();
+    }
+
+    function importData(event) {
+        let file = event.target.files[0];
+        if (!file) return;
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                let data = JSON.parse(e.target.result);
+                if (Array.isArray(data)) {
+                    localStorage.setItem('jdg_ryczalt_entries', JSON.stringify(data));
+                    loadEntries();
+                    alert("Dane zostały pomyślnie zaimportowane!");
+                } else {
+                    alert("Nieprawidłowy format pliku.");
+                }
+            } catch (err) {
+                alert("Błąd odczytu pliku.");
+            }
+        };
+        reader.readAsText(file);
+    }
+</script>
+
+</body>
+</html>

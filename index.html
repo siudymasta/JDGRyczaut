@@ -372,6 +372,13 @@
             
             <button class="btn-secondary" style="margin-bottom: 15px;" onclick="switchView('mainView')">← Powrót do formularza</button>
 
+            <div class="form-group">
+                <label for="statsYearSelect">Wybierz rok podsumowania:</label>
+                <select id="statsYearSelect" onchange="renderDashboard()">
+                    <!-- Generowane dynamicznie -->
+                </select>
+            </div>
+
             <div class="stats-card">
                 <h3 id="statsTitle">Rok 2026</h3>
                 <p>Łączny przychód: <b id="statRevenue">0.00 zł</b></p>
@@ -379,6 +386,8 @@
                 <p>Należny podatek (suma): <b id="statCalcTax">0.00 zł</b></p>
                 <p>Po odliczeniu 50% skł. zdrow. (suma): <b id="statNetTax">0.00 zł</b></p>
                 <p>Zapłacona kwota podatku (suma): <b id="statPaidTax" style="color: #2ecc71;">0.00 zł</b></p>
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.2); margin: 10px 0;">
+                <p id="statBalanceLine">Bilans: <b id="statBalance">0.00 zł</b></p>
             </div>
 
             <h3>Rozbicie na miesiące</h3>
@@ -400,7 +409,8 @@
     let cachedEntries = [];
 
     document.addEventListener("DOMContentLoaded", () => {
-        document.getElementById('yearInput').value = new Date().getFullYear();
+        const currentYear = new Date().getFullYear();
+        document.getElementById('yearInput').value = currentYear;
         checkUserSession();
     });
 
@@ -454,6 +464,7 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
         
         if (viewId === 'statsView') {
+            updateStatsYearSelector();
             renderDashboard();
         }
     }
@@ -481,7 +492,6 @@
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (!user) return;
 
-        // Walidacja pustych pól z pytaniem o wartość 0,00
         const revenueInput = document.getElementById('revenue');
         const socialZusInput = document.getElementById('socialZus');
         const healthZusInput = document.getElementById('healthZus');
@@ -520,6 +530,18 @@
 
         const editingId = document.getElementById('editingId').value;
 
+        // Sprawdzenie duplikatów (czy ten miesiąc już istnieje dla tego użytkownika, chyba że to edycja tego samego wpisu)
+        const duplicate = cachedEntries.find(e => {
+            const mMatch = e.month_name_only ? e.month_name_only === month : e.month.includes(month);
+            const yMatch = e.year_only ? e.year_only == year : e.month.includes(year);
+            return mMatch && yMatch && e.id != editingId;
+        });
+
+        if (duplicate) {
+            alert(`Wpis dla miesiąca ${month} ${year} już istnieje w bazie! Nie można zapisać duplikatu.`);
+            return;
+        }
+
         const entryData = {
             user_id: user.id,
             month: fullMonthName,
@@ -548,11 +570,27 @@
                 .from('entries')
                 .insert([entryData]);
 
-            if (error) alert("Błąd zapisu: " + error.message);
+            if (error) {
+                alert("Błąd zapisu: " + error.message);
+                return;
+            }
         }
 
+        // Obsługa pytania o przejście na kolejny rok po zapisaniu grudnia
+        const isDecember = (month === "Grudzień");
+        const wasEditing = Boolean(editingId);
+
         cancelEdit();
-        loadEntries();
+        await loadEntries();
+
+        if (isDecember && !wasEditing) {
+            const nextYear = parseInt(year) + 1;
+            if (confirm(`Zapisano grudzień ${year}. Czy chcesz przejść do rozliczeń na kolejny rok (${nextYear})?`)) {
+                document.getElementById('yearInput').value = nextYear;
+                document.getElementById('monthSelect').value = "Styczeń";
+                loadEntries();
+            }
+        }
     }
 
     async function deleteEntry(id) {
@@ -660,15 +698,55 @@
         document.getElementById('paidTax').value = '';
     }
 
+    function updateStatsYearSelector() {
+        const select = document.getElementById('statsYearSelect');
+        const currentSelected = select.value;
+        
+        // Wyciągnij unikalne lata z wpisów użytkownika
+        const yearsSet = new Set();
+        cachedEntries.forEach(entry => {
+            if (entry.year_only) yearsSet.add(entry.year_only);
+            else if (entry.month) {
+                const parts = entry.month.split(' ');
+                if (parts.length > 1) yearsSet.add(parts[1]);
+            }
+        });
+
+        // Dodaj też aktualny rok jako domyślny, jeśli brak wpisów
+        const currentYear = new Date().getFullYear();
+        yearsSet.add(currentYear.toString());
+
+        const sortedYears = Array.from(yearsSet).sort((a, b) => b - a);
+
+        select.innerHTML = '';
+        sortedYears.forEach(year => {
+            const opt = document.createElement('option');
+            opt.value = year;
+            opt.innerText = year;
+            select.appendChild(opt);
+        });
+
+        if (sortedYears.includes(currentSelected)) {
+            select.value = currentSelected;
+        } else {
+            select.value = currentYear.toString();
+        }
+    }
+
     // ================= RENDEROWANIE WYNIKÓW =================
     function renderDashboard() {
         const listContainer = document.getElementById('entriesList');
         const statsMonthsList = document.getElementById('statsMonthsList');
         const currentYearFilter = document.getElementById('yearInput').value;
         
+        // Rok dla podsumowania rocznego pobierany z selektora w widoku statystyk
+        const statsYearSelectElem = document.getElementById('statsYearSelect');
+        const statsYearFilter = statsYearSelectElem ? statsYearSelectElem.value : currentYearFilter;
+
         listContainer.innerHTML = '';
         statsMonthsList.innerHTML = '';
 
+        // Wpisy do głównego widoku (oparte na roku z formularza)
         const filteredEntries = cachedEntries.filter(entry => {
             if (entry.year_only) {
                 return entry.year_only == currentYearFilter;
@@ -681,13 +759,26 @@
             return monthsOrder.indexOf(a.month_name_only) - monthsOrder.indexOf(b.month_name_only);
         });
 
+        // Wpisy do podsumowania rocznego (oparte na selektorze w statystykach)
+        const statsEntries = cachedEntries.filter(entry => {
+            if (entry.year_only) {
+                return entry.year_only == statsYearFilter;
+            } else {
+                return entry.month.includes(statsYearFilter);
+            }
+        });
+
+        statsEntries.sort((a, b) => {
+            return monthsOrder.indexOf(a.month_name_only) - monthsOrder.indexOf(b.month_name_only);
+        });
+
         let totalRev = 0;
         let totalZusSum = 0;
         let totalCalcTaxSum = 0;
         let totalNetTaxSum = 0;
         let totalPaidTaxSum = 0;
 
-        filteredEntries.forEach(entry => {
+        statsEntries.forEach(entry => {
             totalRev += entry.revenue;
             totalZusSum += Number(entry.total_zus);
             totalCalcTaxSum += Number(entry.calculated_tax);
@@ -695,53 +786,72 @@
             totalPaidTaxSum += entry.paid_tax;
         });
 
-        document.getElementById('statsTitle').innerText = `Rok ${currentYearFilter}`;
+        document.getElementById('statsTitle').innerText = `Rok ${statsYearFilter}`;
         document.getElementById('statRevenue').innerText = totalRev.toFixed(2) + ' zł';
         document.getElementById('statZus').innerText = totalZusSum.toFixed(2) + ' zł';
         document.getElementById('statCalcTax').innerText = totalCalcTaxSum.toFixed(2) + ' zł';
         document.getElementById('statNetTax').innerText = totalNetTaxSum.toFixed(2) + ' zł';
         document.getElementById('statPaidTax').innerText = totalPaidTaxSum.toFixed(2) + ' zł';
 
-        if (filteredEntries.length === 0) {
-            listContainer.innerHTML = `<p style="color: #777; text-align: center;">Brak zapisanych miesięcy w roku ${currentYearFilter}.</p>`;
-            statsMonthsList.innerHTML = `<p style="color: #777; text-align: center;">Brak danych do rozbicia.</p>`;
-            return;
+        // Obliczenie bilansu (Po odliczeniu 50% skł. zdrow. minus zapłacona kwota podatku)
+        const balance = totalNetTaxSum - totalPaidTaxSum;
+        const balanceElem = document.getElementById('statBalance');
+        const balanceLineElem = document.getElementById('statBalanceLine');
+
+        if (balance < 0) {
+            balanceLineElem.innerHTML = `Bilans: <b style="color: #e74c3c;">Nadpłata: ${Math.abs(balance).toFixed(2)} zł</b>`;
+        } else if (balance > 0) {
+            balanceLineElem.innerHTML = `Bilans: <b style="color: #f39c12;">Niedopłata: ${balance.toFixed(2)} zł</b>`;
+        } else {
+            balanceLineElem.innerHTML = `Bilans: <b style="color: #2ecc71;">0.00 zł (Rozliczone idealnie)</b>`;
         }
 
-        filteredEntries.forEach((entry) => {
-            const card = document.createElement('div');
-            card.className = 'month-card';
-            card.innerHTML = `
-                <div class="actions-btns">
-                    <button class="action-btn edit-btn" onclick="editEntry('${entry.id}')">Edytuj</button>
-                    <button class="action-btn delete-btn" onclick="deleteEntry('${entry.id}')">Usuń</button>
-                </div>
-                <h3>${entry.month}</h3>
-                <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b></p>
-                <p>Społeczne: ${entry.social_zus.toFixed(2)} zł | Zdrowotna: ${entry.health_zus.toFixed(2)} zł</p>
-                <p>Suma ZUS: <b>${Number(entry.total_zus).toFixed(2)} zł</b></p>
-                <div class="tax-info">
-                    <p style="margin: 0 0 4px 0;">Stawka ryczałtu: <b>${entry.tax_rate}%</b></p>
-                    <p style="margin: 0 0 4px 0;">Wyliczony podatek: <b>${entry.calculated_tax} zł</b></p>
-                    <p style="margin: 0 0 4px 0;">Po odliczeniu 50% skł. zdrow.: <b>${entry.net_tax} zł</b></p>
-                    <p style="margin: 0;">Zapłacona kwota podatku: <b style="color: #27ae60;">${entry.paid_tax.toFixed(2)} zł</b></p>
-                </div>
-            `;
-            listContainer.appendChild(card);
+        // Renderowanie listy w głównym widoku
+        if (filteredEntries.length === 0) {
+            listContainer.innerHTML = `<p style="color: #777; text-align: center;">Brak zapisanych miesięcy w roku ${currentYearFilter}.</p>`;
+        } else {
+            filteredEntries.forEach((entry) => {
+                const card = document.createElement('div');
+                card.className = 'month-card';
+                card.innerHTML = `
+                    <div class="actions-btns">
+                        <button class="action-btn edit-btn" onclick="editEntry('${entry.id}')">Edytuj</button>
+                        <button class="action-btn delete-btn" onclick="deleteEntry('${entry.id}')">Usuń</button>
+                    </div>
+                    <h3>${entry.month}</h3>
+                    <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b></p>
+                    <p>Społeczne: ${entry.social_zus.toFixed(2)} zł | Zdrowotna: ${entry.health_zus.toFixed(2)} zł</p>
+                    <p>Suma ZUS: <b>${Number(entry.total_zus).toFixed(2)} zł</b></p>
+                    <div class="tax-info">
+                        <p style="margin: 0 0 4px 0;">Stawka ryczałtu: <b>${entry.tax_rate}%</b></p>
+                        <p style="margin: 0 0 4px 0;">Wyliczony podatek: <b>${entry.calculated_tax} zł</b></p>
+                        <p style="margin: 0 0 4px 0;">Po odliczeniu 50% skł. zdrow.: <b>${entry.net_tax} zł</b></p>
+                        <p style="margin: 0;">Zapłacona kwota podatku: <b style="color: #27ae60;">${entry.paid_tax.toFixed(2)} zł</b></p>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
 
-            const statCard = document.createElement('div');
-            statCard.className = 'month-card';
-            statCard.innerHTML = `
-                <h3>${entry.month}</h3>
-                <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b> (Stawka: ${entry.tax_rate}%)</p>
-                <div class="tax-info">
-                    <p style="margin: 0 0 4px 0;">Należny podatek: <b>${entry.calculated_tax} zł</b></p>
-                    <p style="margin: 0 0 4px 0;">Po odliczeniu 50% skł. zdrow.: <b>${entry.net_tax} zł</b></p>
-                    <p style="margin: 0;">Zapłacona kwota podatku: <b style="color: #27ae60;">${entry.paid_tax.toFixed(2)} zł</b></p>
-                </div>
-            `;
-            statsMonthsList.appendChild(statCard);
-        });
+        // Renderowanie rozbicia na miesiące w statystykach
+        if (statsEntries.length === 0) {
+            statsMonthsList.innerHTML = `<p style="color: #777; text-align: center;">Brak danych do rozbicia w roku ${statsYearFilter}.</p>`;
+        } else {
+            statsEntries.forEach((entry) => {
+                const statCard = document.createElement('div');
+                statCard.className = 'month-card';
+                statCard.innerHTML = `
+                    <h3>${entry.month}</h3>
+                    <p>Przychód: <b>${entry.revenue.toFixed(2)} zł</b> (Stawka: ${entry.tax_rate}%)</p>
+                    <div class="tax-info">
+                        <p style="margin: 0 0 4px 0;">Należny podatek: <b>${entry.calculated_tax} zł</b></p>
+                        <p style="margin: 0 0 4px 0;">Po odliczeniu 50% skł. zdrow.: <b>${entry.net_tax} zł</b></p>
+                        <p style="margin: 0;">Zapłacona kwota podatku: <b style="color: #27ae60;">${entry.paid_tax.toFixed(2)} zł</b></p>
+                    </div>
+                `;
+                statsMonthsList.appendChild(statCard);
+            });
+        }
     }
 </script>
 
